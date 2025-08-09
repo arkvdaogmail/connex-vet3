@@ -1,11 +1,13 @@
-{
-  "version": 2,
-  "builds": [
-    { "src": "package.json", "use": "@vercel/static-build" },
-    { "src": "api/*.js", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "api/$1" },
-    { "src": "/(.*)", "dest": "dist/$1" }
-  ]
-}
+import { defineConfig } from 'vite'
+import { resolve } from 'path'
+
+export default defineConfig({
+  root: 'public',
+  build: {
+    outDir: '../dist',
+    emptyOutDir: true,
+    rollupOptions: {
+      input: resolve(__dirname, 'public/index.html')
+    }
+  }
+})
