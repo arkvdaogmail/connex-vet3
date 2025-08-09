@@ -4,183 +4,89 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VeChain Document Notarization</title>
-
-  <!-- Font Awesome for icons -->
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-        referrerpolicy="no-referrer" />
-
-  <!-- Dark theme styles -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
-    :root{
-      --primary:#4e54c8; --primary-dark:#363b9c; --secondary:#2dce89;
-      --dark:#1e1e2d; --light:#f8f9fa; --gray:#6c757d;
-      --success:#28a745; --danger:#dc3545; --border:#2a2a3a;
-    }
-    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Verdana,sans-serif;}
-    body{
-      min-height:100vh;
-      background:linear-gradient(135deg,#0f0c29,#302b63,#24243e );
-      color:var(--light);
-      padding:20px;
-    }
-    .container{max-width:800px;margin:0 auto;} /* Centered single column layout */
-    header{text-align:center;margin-bottom:28px;}
-    .logo{display:flex;align-items:center;gap:10px;justify-content:center;}
-    .logo i{font-size:28px;color:var(--secondary);}
-    .logo h1{font-size:28px;background:linear-gradient(90deg,#4facfe,#00f2fe);-webkit-background-clip:text;color:transparent;}
-    .subtitle{color:#a9b7d0;margin-top:6px;text-align:center;}
-    .panel{background:rgba(30,30,45,0.85);border:1px solid rgba(255,255,255,0.1);
-      border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,0.35);padding:22px;}
-    .panel-title{display:flex;align-items:center;gap:10px;padding-bottom:12px;
-      border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:16px;}
-    .panel-title i{font-size:22px;color:var(--secondary);}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 16px;border-radius:10px;
-      font-weight:600;border:none;cursor:pointer;transition: background-color 0.3s;}
-    .btn-primary{background:linear-gradient(90deg,var(--primary),var(--primary-dark));color:#fff;}
-    .btn-success{background:linear-gradient(90deg,#2dce89,#1ca064);color:#fff;}
+    :root{--primary:#4e54c8;--secondary:#2dce89;--dark:#1e1e2d;--light:#f8f9fa;--gray:#6c757d;--success:#28a745;--danger:#dc3545;}
+    body{font-family:sans-serif;min-height:100vh;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e );color:var(--light);padding:20px;display:flex;align-items:center;justify-content:center;}
+    .container{max-width:600px;width:100%;background:rgba(30,30,45,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:25px;box-shadow:0 10px 30px rgba(0,0,0,0.35);}
+    header{text-align:center;margin-bottom:20px;}
+    header h1{font-size:24px;color:var(--light);}
+    header p{color:#a9b7d0;margin-top:6px;}
+    .panel-title{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:16px;}
+    .panel-title i{font-size:20px;color:var(--secondary);}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border-radius:10px;font-weight:600;border:none;cursor:pointer;background:linear-gradient(90deg,var(--primary),#363b9c);color:#fff;}
     .btn:disabled{background:var(--gray);cursor:not-allowed;}
-    .status{margin-top:14px;padding:12px;border-radius:10px;font-weight:600;display:none; word-break: break-all;}
+    .status{margin-top:16px;padding:12px;border-radius:10px;font-weight:600;display:none;word-break:break-all;}
     .status.success{display:block;color:#34d399;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);}
     .status.error{display:block;color:#f87171;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);}
     .status.info{display:block;color:#60a5fa;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);}
-    .status a {color: #6ee7b7; text-decoration: none;}
-    .status a:hover {text-decoration: underline;}
-    .drop{border:2px dashed rgba(255,255,255,0.2);border-radius:10px;padding:24px;
-      background:rgba(45,45,65,0.3);text-align:center;cursor:pointer;}
-    .hash-box{background:rgba(0,0,0,0.35);padding:14px;border-radius:10px;
-      font-family:monospace;word-break:break-all;}
+    .status a{color:#6ee7b7;text-decoration:underline;}
+    .status strong.hash-label { color: #a9b7d0; }
+    .status code.hash-value { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+    .drop{border:2px dashed rgba(255,255,255,0.2);border-radius:10px;padding:24px;text-align:center;cursor:pointer;margin-bottom:16px;}
+    #fileInfo{font-size:14px;opacity:0.9;}
   </style>
 </head>
 <body>
   <div class="container">
-    <header>
-      <div class="logo"><i class="fas fa-file-signature"></i><h1>VeChain Document Notarization</h1></div>
-      <p class="subtitle">Upload a document to permanently notarize its hash on the VeChain Testnet.</p>
-    </header>
-
-    <div class="grid">
-      <!-- Main panel for notarization -->
-      <section class="panel">
-        <div class="panel-title"><i class="fas fa-fingerprint"></i><h2>Step 1: Upload Your Document</h2></div>
-        <div class="drop" id="dropZone">
-          <i class="fas fa-cloud-upload-alt" style="font-size:28px;"></i>
-          <h3>Upload Document</h3>
-          <p style="opacity:0.8;">Drag & drop or click to browse</p>
-          <input type="file" id="fileInput" hidden>
-        </div>
-        <div id="fileInfo" style="margin-top:12px;display:none;">
-          <div><strong>File:</strong> <span id="fileName">-</span></div>
-          <div><strong>Size:</strong> <span id="fileSize">-</span></div>
-        </div>
-
-        <div id="notarizeSection" style="display:none; margin-top: 20px;">
-            <div class="panel-title"><i class="fas fa-pen-to-square"></i><h2>Step 2: Notarize on VeChain</h2></div>
-            <p style="opacity:0.8; margin-bottom: 12px;">Click the button below to send the document's hash to the blockchain.</p>
-            <button class="btn btn-success" id="notarizeButton"><i class="fas fa-paper-plane"></i>Notarize Document on VeChain</button>
-        </div>
-
-        <!-- Status display for transaction results -->
-        <div id="txStatus" class="status"></div>
-      </section>
-    </div>
-
-    <footer style="text-align:center;opacity:0.8;margin-top:28px;">VeChain Notarization v1.0</footer>
+    <header><h1>VeChain Document Notarization</h1><p>Upload a document to notarize its hash on the VeChain Testnet.</p></header>
+    <div class="panel-title"><i class="fas fa-fingerprint"></i><h2>Notarize a Document</h2></div>
+    <div class="drop" id="dropZone"><i class="fas fa-cloud-upload-alt"></i><p>Click or Drag & Drop File</p></div>
+    <input type="file" id="fileInput" hidden />
+    <div id="fileInfo" style="display:none;"><strong>File:</strong> <span id="fileName">-</span></div>
+    <button class="btn" id="notarizeButton" style="margin-top:16px;" disabled><i class="fas fa-pen-to-square"></i>Notarize on VeChain</button>
+    <div id="txStatus" class="status"></div>
   </div>
-
   <script>
-    // --- ELEMENT SELECTORS ---
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const fileInfo = document.getElementById('fileInfo');
-    const fileName = document.getElementById('fileName');
-    const fileSize = document.getElementById('fileSize');
-    const notarizeSection = document.getElementById('notarizeSection');
-    const notarizeButton = document.getElementById('notarizeButton');
-    const txStatus = document.getElementById('txStatus');
-    let currentFile = null;
-
-    // --- FILE HANDLING LOGIC ---
-    function handleFile(file) {
-      currentFile = file;
-      fileInfo.style.display = 'block';
-      fileName.textContent = file.name;
-      fileSize.textContent = (file.size / 1024).toFixed(2) + ' KB';
-      notarizeSection.style.display = 'block'; // Show the notarize button
-      txStatus.style.display = 'none'; // Hide previous status messages
-    }
-
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
-    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = 'rgba(255,255,255,0.2)'; });
-    dropZone.addEventListener('drop', e => {
-      e.preventDefault();
-      dropZone.style.borderColor = 'rgba(255,255,255,0.2)';
-      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-    });
-    fileInput.addEventListener('change', e => {
-      if (e.target.files[0]) handleFile(e.target.files[0]);
-    });
-
-    // --- NOTARIZATION LOGIC ---
-    notarizeButton.addEventListener('click', async () => {
-      if (!currentFile) {
-        alert('Please upload a file first.');
-        return;
-      }
-
-      // Disable button and show processing message
-      notarizeButton.disabled = true;
-      notarizeButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-      txStatus.className = 'status info';
-      txStatus.textContent = 'Generating hash and sending to VeChain...';
-
+    const dropZone=document.getElementById('dropZone'),fileInput=document.getElementById('fileInput'),fileInfo=document.getElementById('fileInfo'),fileName=document.getElementById('fileName'),notarizeButton=document.getElementById('notarizeButton'),txStatus=document.getElementById('txStatus');
+    let currentFile=null;
+    function handleFile(f){currentFile=f;fileInfo.style.display='block';fileName.textContent=f.name;notarizeButton.disabled=false;txStatus.style.display='none';}
+    dropZone.addEventListener('click',()=>fileInput.click());
+    fileInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0])});
+    dropZone.addEventListener('dragover',e=>e.preventDefault());
+    dropZone.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])});
+    notarizeButton.addEventListener('click',async()=>{
+      if(!currentFile)return;
+      notarizeButton.disabled=true;notarizeButton.innerHTML='<i class="fas fa-spinner fa-spin"></i> Processing...';
+      txStatus.className='status info';txStatus.textContent='Generating hash and sending to VeChain...';txStatus.style.display='block';
       try {
-        // Step 1: Generate SHA-256 hash of the file content
-        const fileBuffer = await currentFile.arrayBuffer();
-        const hashDigest = await crypto.subtle.digest('SHA-256', fileBuffer);
-        const hashArray = Array.from(new Uint8Array(hashDigest));
+        const hashBuffer = await currentFile.arrayBuffer();
+        const hashArray = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', hashBuffer)));
         const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-        // Step 2: Send the hash to the backend API
         const response = await fetch('/notarize', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: fileHash }) // Send the hash as content
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({content: fileHash})
         });
-
         const data = await response.json();
+        if (!response.ok) { throw new Error(data.message || 'Unknown server error'); }
+        const explorerUrl = `https://explore-testnet.vechain.org/transactions/${data.transaction_id}`;
+        txStatus.className = 'status success';
+        txStatus.innerHTML = `
+          <strong>Success! Document Notarized.</strong>
+          <hr style="border-color: rgba(255,255,255,0.1 ); margin: 10px 0;">
+          <strong class="hash-label">File Hash (SHA-256):</strong>  
 
-        if (response.ok && data.status === 'success') {
-          // SUCCESS: Display the clickable transaction ID
-          const explorerUrl = `https://explore-testnet.vechain.org/transactions/${data.transaction_id}`;
-          txStatus.className = 'status success';
-          txStatus.innerHTML = `
-            <strong>Notarization Successful!</strong>  
-
-            Transaction ID: 
-            <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer">
-              ${data.transaction_id}
-            </a>
-              
+          <code class="hash-value">${fileHash}</code>
+            
   
 
-            <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer">
-              Click here to view on VeChain Explorer
-            </a>`;
-        } else {
-          // ERROR: Display the error message from the backend
-          throw new Error(data.message || 'An unknown error occurred.' );
-        }
-      } catch (error) {
+          <strong class="hash-label">Transaction ID:</strong>  
+
+          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer">${data.transaction_id}</a>
+            
+  
+
+          <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer"><strong>Click to view on VeChain Explorer</strong></a>`;
+      } catch(error) {
         txStatus.className = 'status error';
         txStatus.textContent = `Error: ${error.message}`;
       } finally {
-        // Re-enable the button
         notarizeButton.disabled = false;
-        notarizeButton.innerHTML = '<i class="fas fa-paper-plane"></i> Notarize Document on VeChain';
+        notarizeButton.innerHTML = '<i class="fas fa-pen-to-square"></i> Notarize on VeChain';
       }
     });
   </script>
 </body>
 </html>
+
