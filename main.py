@@ -32,10 +32,10 @@ NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY") # This is your 12-word phrase
 
-# --- CRITICAL STEP: Derive the private key from your 12-word phrase ---
+# --- NEW, CORRECTED CODE ---
 try:
     PRIVATE_KEY_BYTES = cry.mnemonic.derive_private_key(MNEMONIC_PHRASE.split(' '))
-    SENDER_ADDRESS = cry.private_key_to_address(PRIVATE_KEY_BYTES)
+    SENDER_ADDRESS = cry.to_address(PRIVATE_KEY_BYTES) # <--- THIS IS THE CORRECT FUNCTION NAME
     print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
 except Exception as e:
     print(f"FATAL ERROR: Could not derive private key from mnemonic. Please check your .env file. Error: {e}")
