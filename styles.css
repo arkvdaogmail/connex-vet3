@@ -1,0 +1,49 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: Arial, sans-serif;
+}
+
+button, label {
+  background: #2a5ada;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  margin: 10px 0;
+  display: inline-block;
+}
+
+button:hover, label:hover {
+  background: #1e4ac4;
+}
+
+.upload-section {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px dashed #ccc;
+  border-radius: 5px;
+}
+
+.hash-display {
+  background: #f5f5f5;
+  padding: 15px;
+  border-radius: 5px;
+  margin: 20px 0;
+}
+
+.hash-display code {
+  word-break: break-all;
+  display: block;
+  margin: 10px 0;
+  background: white;
+  padding: 10px;
+}
+
+.tx-info a {
+  color: #2a5ada;
+  word-break: break-all;
+}

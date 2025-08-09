@@ -1,0 +1,24 @@
+/* Add basic styles */
+body {
+  font-family: Arial, sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hash-result {
+  background: #f5f5f5;
+  padding: 15px;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+
+.hash-result code {
+  word-break: break-all;
+}
