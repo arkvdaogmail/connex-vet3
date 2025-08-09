@@ -1,11 +1,11 @@
 {
   "version": 2,
   "builds": [
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "api/prepaid-tx.js", "use": "@vercel/node" }
+    { "src": "vite.config.js", "use": "@vercel/static-build" },
+    { "src": "api/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/prepaid-tx", "dest": "api/prepaid-tx.js" },
-    { "src": "/(.*)", "dest": "index.html" }
+    { "src": "/api/(.*)", "dest": "api/$1" },
+    { "src": "/(.*)", "dest": "dist/$1" }
   ]
 }
