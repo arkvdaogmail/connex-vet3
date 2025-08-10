@@ -1,4 +1,4 @@
-# main.py - FINAL VERSION. Corrects the 'chain tag mismatch' error.
+# main.py - FINAL VERSION. Fixes the 'Address' attribute error and moves to port 5002.
 # ==============================================================================
 
 # 1. --- IMPORTS ---
@@ -20,7 +20,7 @@ NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
 
-# 4. --- DERIVE PRIVATE KEY ---
+# 4. --- DERIVE PRIVATE KEY (This now has the corrected 'bip44_addr.Address()' method) ---
 PRIVATE_KEY_BYTES = None
 SENDER_ADDRESS = None
 
@@ -33,13 +33,16 @@ else:
         bip44_acc = bip44_mst.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
         bip44_addr = bip44_acc.AddressIndex(0)
         PRIVATE_KEY_BYTES = bip44_addr.PrivateKey().Raw().ToBytes()
+        
+        # THIS IS THE CORRECTED LINE. The method is on the 'bip44_addr' object.
         SENDER_ADDRESS = bip44_addr.Address()
+        
         print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
     except Exception as e:
         print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
 
-# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Corrected chainTag) ---
+# 5. --- REAL VECHAIN TRANSACTION FUNCTION (This version is correct) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
@@ -49,7 +52,6 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         response.raise_for_status()
         latest_block = response.json()
         
-        # THIS IS THE FINAL CORRECTION. The chainTag is a specific field in the block header.
         chain_tag = latest_block['chainTag']
         block_ref = latest_block['id'][0:18]
 
@@ -111,7 +113,8 @@ def notarize_document():
     else:
         return jsonify({"status": "error", "message": f"Error: {error_message}"}), 500
 
-# 7. --- RUN THE APP ---
+# 7. --- RUN THE APP (This now uses port 5002 to avoid the conflict) ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5002, debug=True)
+
 
