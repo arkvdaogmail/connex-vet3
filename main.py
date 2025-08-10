@@ -1,4 +1,7 @@
+# main.py - This is the version that passed internal testing.
+# ==============================================================================
 
+# 1. --- IMPORTS ---
 from flask import Flask, request, jsonify, render_template
 import requests
 import os
@@ -96,9 +99,5 @@ def notarize_document():
 # 7. --- RUN THE APP (No changes needed here) ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
-
-
-
-
 
 
