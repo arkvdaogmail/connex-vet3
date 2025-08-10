@@ -1,13 +1,13 @@
-# main.py - The Final Version (Fixes SyntaxError and All Previous Bugs)
+# main.py - The FINAL, REBUILT Version using a more reliable library
 # ==============================================================================
 
 # 1. --- IMPORTS ---
 from flask import Flask, request, jsonify, render_template
 import requests
-from thor_devkit import cry, transaction
 import os
 from dotenv import load_dotenv
 import time
+from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
 
 # 2. --- INITIALIZATION ---
 load_dotenv()
@@ -18,29 +18,38 @@ NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
 
-# 4. --- DERIVE PRIVATE KEY (with all corrections) ---
+# 4. --- DERIVE PRIVATE KEY (New, More Reliable Method) ---
 PRIVATE_KEY_BYTES = None
+SENDER_ADDRESS = None
 
 if not MNEMONIC_PHRASE:
     print("FATAL ERROR: 'PRIVATE_KEY' not found in .env file.")
 else:
-    # This is the corrected try/except block
     try:
-        PRIVATE_KEY_BYTES = cry.mnemonic.derive_private_key(MNEMONIC_PHRASE.split(' '))
-        # This is the corrected function call
-        SENDER_ADDRESS = cry.public_key_to_address(cry.private_key_to_public_key(PRIVATE_KEY_BYTES))
+        # Generate seed from the 12-word mnemonic
+        seed_bytes = Bip39SeedGenerator(MNEMONIC_PHRASE).Generate()
+        # Derive the VeChain key using the standard BIP44 path for VET
+        bip44_mst = Bip44.FromSeed(seed_bytes, Bip44Coins.VECHAIN)
+        bip44_acc = bip44_mst.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
+        bip44_addr = bip44_acc.AddressIndex(0)
+        
+        # Get the private key bytes and the address
+        PRIVATE_KEY_BYTES = bip44_addr.PrivateKey().Raw().ToBytes()
+        SENDER_ADDRESS = bip44_addr.Address()
         print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
     except Exception as e:
-        print(f"FATAL ERROR: Could not derive private key from the mnemonic phrase.")
+        print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
-        PRIVATE_KEY_BYTES = None
 
-# 5. --- REAL VECHAIN TRANSACTION FUNCTION ---
+# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Now uses thor-devkit only for signing) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
     
     try:
+        # This part remains the same as it's standard REST API interaction
+        from thor_devkit import transaction # Import only what we need
+        
         response = requests.get(f"{NODE_URL}/blocks/best")
         response.raise_for_status()
         latest_block = response.json()
@@ -59,6 +68,7 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         tx = transaction.Transaction(tx_body)
         tx.sign(PRIVATE_KEY_BYTES)
         raw_tx = '0x' + tx.encode().hex()
+        
         send_response = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
         send_response.raise_for_status()
         tx_id = send_response.json()['id']
@@ -68,7 +78,7 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         print(f"ERROR sending transaction: {e}")
         return None, str(e)
 
-# 6. --- FLASK ROUTES ---
+# 6. --- FLASK ROUTES (No changes needed here) ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -87,9 +97,10 @@ def notarize_document():
     else:
         return jsonify({"status": "error", "message": f"Error: {error_message}"}), 500
 
-# 7. --- RUN THE APP ---
+# 7. --- RUN THE APP (No changes needed here) ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+
 
 
 
