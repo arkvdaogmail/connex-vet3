@@ -1,75 +1,99 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import os
 import requests
+from flask import Flask, request, jsonify, send_from_directory
 from thor_devkit import cry, transaction
-from dotenv import load_dotenv
-
-load_dotenv()
+from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Enable CORS
 
-# Environment variables
-NODE_URL = os.getenv('NODE_URL', 'https://testnet.vechain.org')
-CONTRACT_ADDRESS = os.getenv('CONTRACT_ADDRESS')
-PRIVATE_KEY = os.getenv('PRIVATE_KEY')
+# Get environment variables
+NODE_URL = os.environ.get('NODE_URL', 'https://testnet.vechain.org')
+CONTRACT_ADDRESS = os.environ.get('CONTRACT_ADDRESS')
+PRIVATE_KEY = os.environ.get('PRIVATE_KEY')
 
 @app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "ok"}), 200
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        "status": "OK",
+        "service": "VeChain Notarization",
+        "version": "1.0"
+    })
 
 @app.route('/notarize', methods=['POST'])
 def notarize():
-    data = request.get_json()
-    if not data or 'content' not in data:
-        return jsonify({"error": "Missing 'content' in request body"}), 400
+    """Notarize content hash on VeChain"""
+    try:
+        # Get and validate content hash
+        data = request.get_json()
+        content_hash = data.get('content', '').strip()
         
-    content = data['content']
-    
-    # Validate content (64-character hex string)
-    if len(content) != 64 or not all(c in '0123456789abcdef' for c in content):
-        return jsonify({"error": "Invalid content format"}), 400
+        if not content_hash:
+            return jsonify({"error": "Missing content hash"}), 400
+            
+        if len(content_hash) != 64 or not all(c in '0123456789abcdef' for c in content_hash):
+            return jsonify({"error": "Invalid hash format. Must be 64-character hex string"}), 400
 
-    # Create transaction
-    tx = {
-        "chainTag": 39,
-        "blockRef": "0x0000000000000000",
-        "expiration": 32,
-        "clauses": [{
-            "to": CONTRACT_ADDRESS,
-            "value": "0x0",
-            "data": f"0x{content}"
-        }],
-        "gasPriceCoef": 0,
-        "gas": 50000,
-        "dependsOn": None,
-        "nonce": 12345678
-    }
+        # Create transaction
+        clause = {
+            'to': CONTRACT_ADDRESS,
+            'value': 0,
+            'data': '0x' + content_hash
+        }
 
-    # Sign transaction
-    encoded = transaction.encode(tx)
-    hashed = cry.blake2b256(encoded)
-    signature = cry.secp256k1.sign(hashed, bytes.fromhex(PRIVATE_KEY))
-    tx["signature"] = signature
+        tx = transaction.Transaction(
+            chainTag=0x4a,  # Testnet chain tag
+            blockRef=0,
+            expiration=720,  # 720 blocks expiration
+            clauses=[clause],
+            gasPriceCoef=0,
+            gas=50000,
+            nonce=12345678
+        )
 
-    # Send transaction
-    response = requests.post(
-        f"{NODE_URL}/transactions",
-        json=tx,
-        headers={'Content-Type': 'application/json'}
-    )
-    
-    if response.status_code != 200:
+        # Sign transaction
+        private_key_bytes = bytes.fromhex(PRIVATE_KEY)
+        message_hash = tx.get_signing_hash()
+        signature = cry.secp256k1.sign(message_hash, private_key_bytes)
+        tx.signature = signature
+
+        # Serialize transaction
+        raw_tx = '0x' + tx.encode().hex()
+
+        # Send to VeChain node
+        response = requests.post(
+            f"{NODE_URL}/transactions",
+            json={"raw": raw_tx},
+            headers={'Content-Type': 'application/json'},
+            timeout=10
+        )
+
+        # Handle response
+        if response.status_code != 200:
+            error_msg = response.json().get('message', 'Blockchain error')
+            return jsonify({
+                "error": "Transaction failed",
+                "details": error_msg
+            }), 500
+
         return jsonify({
-            "error": "Blockchain transaction failed",
-            "details": response.text
-        }), 500
+            "status": "success",
+            "txId": response.json()['id']
+        })
 
-    return jsonify({
-        "status": "success",
-        "txId": response.json()['id']
-    }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Serve frontend files
+@app.route('/')
+def serve_index():
+    return send_from_directory('frontend', 'index.html')
+
+@app.route('/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('frontend', filename)
 
 if __name__ == '__main__':
-    app.run(port=5002, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
