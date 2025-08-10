@@ -1,4 +1,4 @@
-# main.py - The Final, Corrected, and Most Robust Version
+# main.py - The Final, Corrected Version (Fixes the TypeError Crash)
 # ==============================================================================
 
 # 1. --- IMPORTS ---
@@ -10,11 +10,8 @@ from dotenv import load_dotenv
 import time
 
 # 2. --- INITIALIZATION ---
-# Load the .env file. The `find_dotenv()` function helps locate it reliably.
-# If the .env file is not found, this will print a clear warning.
-env_path = load_dotenv(find_dotenv=True)
-if not env_path:
-    print("!!! WARNING: .env file not found. Make sure it exists in the project root directory.")
+# This is the corrected line. It simply loads the .env file without the incompatible argument.
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -99,3 +96,4 @@ def notarize_document():
 # 7. --- RUN THE APP ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+
