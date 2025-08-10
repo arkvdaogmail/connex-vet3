@@ -37,6 +37,8 @@
     <button class="btn" id="notarizeButton" style="margin-top:16px;" disabled><i class="fas fa-pen-to-square"></i>Notarize on VeChain</button>
     <div id="txStatus" class="status"></div>
   </div>
+
+  <!-- THIS SCRIPT HAS THE FINAL CORRECTION IN THE CATCH BLOCK -->
   <script>
     const dropZone=document.getElementById('dropZone'),fileInput=document.getElementById('fileInput'),fileInfo=document.getElementById('fileInfo'),fileName=document.getElementById('fileName'),notarizeButton=document.getElementById('notarizeButton'),txStatus=document.getElementById('txStatus');
     let currentFile=null;
@@ -45,21 +47,31 @@
     fileInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0])});
     dropZone.addEventListener('dragover',e=>e.preventDefault());
     dropZone.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])});
+    
     notarizeButton.addEventListener('click',async()=>{
       if(!currentFile)return;
       notarizeButton.disabled=true;notarizeButton.innerHTML='<i class="fas fa-spinner fa-spin"></i> Processing...';
       txStatus.className='status info';txStatus.textContent='Generating hash and sending to VeChain...';txStatus.style.display='block';
+      
       try {
         const hashBuffer = await currentFile.arrayBuffer();
         const hashArray = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', hashBuffer)));
         const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
         const response = await fetch('/notarize', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({content: fileHash})
         });
+        
         const data = await response.json();
-        if (!response.ok) { throw new Error(data.message || 'Unknown server error'); }
+        
+        // This line checks if the server responded with an error status (like 500)
+        if (!response.ok) {
+          // If it's an error, we use the 'message' field from the JSON data
+          throw new Error(data.message || 'An unknown server error occurred');
+        }
+
         const explorerUrl = `https://explore-testnet.vechain.org/transactions/${data.transaction_id}`;
         txStatus.className = 'status success';
         txStatus.innerHTML = `
@@ -78,8 +90,11 @@
   
 
           <a href="${explorerUrl}" target="_blank" rel="noopener noreferrer"><strong>Click to view on VeChain Explorer</strong></a>`;
+
       } catch(error) {
+        // THIS IS THE CORRECTED CATCH BLOCK
         txStatus.className = 'status error';
+        // This correctly displays the error message string
         txStatus.textContent = `Error: ${error.message}`;
       } finally {
         notarizeButton.disabled = false;
@@ -89,4 +104,3 @@
   </script>
 </body>
 </html>
-
