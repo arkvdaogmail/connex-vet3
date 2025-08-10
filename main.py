@@ -1,26 +1,26 @@
-# main.py - The Final, Complete Version with the Server Run Command
+# main.py - FINAL VERSION. Rebuilt to match official VeChain examples.
 # ==============================================================================
 
-# --- IMPORTS ---
+# 1. --- IMPORTS ---
 from flask import Flask, request, jsonify, render_template
 import requests
 import os
 from dotenv import load_dotenv
-import time
+import secrets
 from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
 from thor_devkit.transaction import Transaction
 from thor_devkit.cry import secp256k1
 
-# --- INITIALIZATION ---
+# 2. --- INITIALIZATION ---
 load_dotenv()
 app = Flask(__name__)
 
-# --- CONFIGURATION ---
+# 3. --- CONFIGURATION ---
 NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
 
-# --- DERIVE PRIVATE KEY ---
+# 4. --- DERIVE PRIVATE KEY ---
 PRIVATE_KEY_BYTES = None
 SENDER_ADDRESS = None
 
@@ -33,48 +33,59 @@ else:
         bip44_acc = bip44_mst.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
         bip44_addr = bip44_acc.AddressIndex(0)
         PRIVATE_KEY_BYTES = bip44_addr.PrivateKey().Raw().ToBytes()
-        # This is the corrected way to get the address from bip_utils
         SENDER_ADDRESS = bip44_addr.Address()
         print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
     except Exception as e:
         print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
 
-# --- VECHAIN TRANSACTION FUNCTION ---
+# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Rebuilt based on official examples) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
+    
     try:
         response = requests.get(f"{NODE_URL}/blocks/best")
         response.raise_for_status()
         latest_block = response.json()
-        # Corrected keys for the response object
-        chain_tag = int(latest_block['id'][2:4], 16)
+        
+        # Structure based on official examples
+        chain_tag = int(latest_block['id'][-2:], 16)
         block_ref = latest_block['id'][:18]
 
-        encoded_data = data_to_store_on_chain.encode('utf-8').hex()
-        # Corrected data payload for the contract
-        clauses = [{'to': CONTRACT_ADDRESS, 'value': 0, 'data': f"0x6057361d{encoded_data}"}]
+        # The data needs to be a 32-byte hex string for the smart contract
+        # We will use the hash directly as the data payload.
+        # The contract function selector is `0x6057361d`
+        hex_data = data_to_store_on_chain
+        clauses = [{
+            'to': CONTRACT_ADDRESS,
+            'value': "0", # Value must be a string "0"
+            'data': f"0x6057361d{hex_data.replace('0x', '')}"
+        }]
 
         tx_body = {
             'chainTag': chain_tag,
             'blockRef': block_ref,
             'expiration': 32,
             'clauses': clauses,
-            'gasPriceCoef': 128,
+            'gasPriceCoef': 0, # Use 0 for testnet as recommended in some examples
             'gas': 100000,
             'dependsOn': None,
-            'nonce': int(time.time() * 1000)
+            'nonce': secrets.randbits(64)
         }
 
         tx = Transaction(tx_body)
         signing_hash = tx.get_signing_hash()
         signature = secp256k1.sign(signing_hash, PRIVATE_KEY_BYTES)
         tx.set_signature(signature)
+        
         raw_tx = '0x' + tx.encode().hex()
-
+        
         send_response = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
-        send_response.raise_for_status()
+        
+        if send_response.status_code != 200:
+            raise Exception(f"API Error {send_response.status_code}: {send_response.text}")
+            
         tx_id = send_response.json()['id']
         print(f"SUCCESS: Transaction sent! ID: {tx_id}")
         return tx_id, None
@@ -82,7 +93,7 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         print(f"ERROR sending transaction: {e}")
         return None, str(e)
 
-# --- FLASK ROUTES ---
+# 6. --- FLASK ROUTES ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -101,7 +112,7 @@ def notarize_document():
     else:
         return jsonify({"status": "error", "message": f"Error: {error_message}"}), 500
 
-# !!! THIS IS THE MISSING PIECE THAT ACTUALLY STARTS THE SERVER !!!
+# 7. --- RUN THE APP ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
 
