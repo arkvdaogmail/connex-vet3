@@ -1,7 +1,3 @@
-# main.py - FINAL VERSION. Built with all of the user's final, correct specifications.
-# ======================================================================================
-
-# 1. --- IMPORTS ---
 from flask import Flask, request, jsonify, render_template
 import requests
 import os
@@ -11,16 +7,16 @@ from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
 from thor_devkit.transaction import Transaction
 from thor_devkit.cry import secp256k1
 
-# 2. --- INITIALIZATION ---
+# --- INITIALIZATION ---
 load_dotenv()
 app = Flask(__name__)
 
-# 3. --- CONFIGURATION ---
+# --- CONFIGURATION ---
 NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
 
-# 4. --- DERIVE PRIVATE KEY (This part is correct) ---
+# --- DERIVE PRIVATE KEY ---
 PRIVATE_KEY_BYTES = None
 SENDER_ADDRESS = None
 
@@ -39,17 +35,14 @@ else:
         print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
 
-# 5. --- REAL VECHAIN TRANSACTION FUNCTION (With all user corrections) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
-    
     try:
         response = requests.get(f"{NODE_URL}/blocks/best")
         response.raise_for_status()
         latest_block = response.json()
-        
-        # CORRECTED blockRef to skip the '0x' prefix, as per user's instruction.
+        # blockRef: first 8 bytes (16 hex chars) after '0x'
         block_ref = latest_block['id'][2:18]
 
         hex_data = data_to_store_on_chain.replace('0x', '')
@@ -57,14 +50,12 @@ def send_vechain_transaction(data_to_store_on_chain: str):
 
         clauses = [{
             'to': CONTRACT_ADDRESS,
-            # CORRECTED value to be an integer 0, as per user's instruction.
             'value': 0,
             'data': data_payload
         }]
 
         tx_body = {
-            # CORRECTED chainTag to be hardcoded, as per user's instruction.
-            'chainTag': 0x27,
+            'chainTag': 0x27,  # Testnet; use 0x4a for mainnet
             'blockRef': block_ref,
             'expiration': 32,
             'clauses': clauses,
@@ -78,14 +69,12 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         signing_hash = tx.get_signing_hash()
         signature = secp256k1.sign(signing_hash, PRIVATE_KEY_BYTES)
         tx.set_signature(signature)
-        
         raw_tx = '0x' + tx.encode().hex()
-        
+
         send_response = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
-        
         if send_response.status_code != 200:
             raise Exception(f"API Error {send_response.status_code}: {send_response.text}")
-            
+
         tx_id = send_response.json()['id']
         print(f"SUCCESS: Transaction sent! ID: {tx_id}")
         return tx_id, None
@@ -93,7 +82,6 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         print(f"ERROR sending transaction: {e}")
         return None, str(e)
 
-# 6. --- FLASK ROUTES ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -101,19 +89,17 @@ def index():
 @app.route('/notarize', methods=['POST'])
 def notarize_document():
     data = request.json
-    # CORRECTED the typo from file_.hash to file_hash, as per user's instruction.
     file_hash = data.get('content')
     if not file_hash:
         return jsonify({"status": "error", "message": "No file hash provided."}), 400
-    
+
     transaction_id, error_message = send_vechain_transaction(file_hash)
-    
+
     if transaction_id:
         return jsonify({"status": "success", "transaction_id": transaction_id})
     else:
         return jsonify({"status": "error", "message": f"Error: {error_message}"}), 500
 
-# 7. --- RUN THE APP ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=True)
 
