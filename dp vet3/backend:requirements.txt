@@ -1,0 +1,5 @@
+flask
+requests
+python-dotenv
+thor-devkit
+flask-cors
