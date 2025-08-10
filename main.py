@@ -1,5 +1,46 @@
+# main.py - FINAL VERSION. Respects the 18-character contract limit as per the user's correct analysis.
+# =======================================================================================================
+
+# 1. --- IMPORTS ---
+from flask import Flask, request, jsonify, render_template
+import requests
+import os
+from dotenv import load_dotenv
+import secrets
+from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
+from thor_devkit.transaction import Transaction
+from thor_devkit.cry import secp256k1
+
+# 2. --- INITIALIZATION ---
+load_dotenv()
+app = Flask(__name__)
+
+# 3. --- CONFIGURATION ---
+NODE_URL = os.getenv("NODE_URL")
+CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
+MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
 MAX_STRING_LENGTH = 18
 
+# 4. --- DERIVE PRIVATE KEY (This part is correct) ---
+PRIVATE_KEY_BYTES = None
+SENDER_ADDRESS = None
+
+if not MNEMONIC_PHRASE:
+    print("FATAL ERROR: 'PRIVATE_KEY' not found in .env file.")
+else:
+    try:
+        seed_bytes = Bip39SeedGenerator(MNEMONIC_PHRASE).Generate()
+        bip44_mst = Bip44.FromSeed(seed_bytes, Bip44Coins.VECHAIN)
+        bip44_acc = bip44_mst.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
+        bip44_addr = bip44_acc.AddressIndex(0)
+        PRIVATE_KEY_BYTES = bip44_addr.PrivateKey().Raw().ToBytes()
+        SENDER_ADDRESS = bip44_addr.Address()
+        print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
+    except Exception as e:
+        print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
+        print(f"           Underlying Error: {e}")
+
+# 5. --- VECHAIN TRANSACTION FUNCTION (Combined and improved version) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
@@ -50,6 +91,50 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         print(f"ERROR sending transaction: {e}")
         return None, str(e)
 
+# 6. --- FLASK ROUTES ---
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/send_transaction', methods=['POST'])
+def send_transaction():
+    try:
+        data = request.get_json()
+        if not data or 'data' not in data:
+            return jsonify({'error': 'Missing data field'}), 400
+        
+        data_to_store = data['data']
+        tx_id, error = send_vechain_transaction(data_to_store)
+        
+        if error:
+            return jsonify({'error': error}), 400
+        
+        return jsonify({'success': True, 'transaction_id': tx_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'node_url': NODE_URL,
+        'contract_address': CONTRACT_ADDRESS,
+        'sender_address': SENDER_ADDRESS,
+        'max_string_length': MAX_STRING_LENGTH
+    })
+
+# 7. --- MAIN EXECUTION ---
+if __name__ == '__main__':
+    if not NODE_URL or not CONTRACT_ADDRESS:
+        print("FATAL ERROR: NODE_URL or CONTRACT_ADDRESS not configured in .env file")
+        exit(1)
+    
+    print(f"Starting VeChain Flask App...")
+    print(f"Node URL: {NODE_URL}")
+    print(f"Contract Address: {CONTRACT_ADDRESS}")
+    print(f"Max String Length: {MAX_STRING_LENGTH}")
+    
+    app.run(host='0.0.0.0', port=5000, debug=True)
 
 
 
