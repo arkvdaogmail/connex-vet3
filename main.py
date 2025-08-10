@@ -17,7 +17,7 @@ load_dotenv()
 NODE_URL = os.getenv("NODE_URL")  # e.g. "https://testnet.vechain.org"
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 PRIVATE_KEY_HEX = os.getenv("PRIVATE_KEY")
-MAX_STRING_LENGTH = 18
+MAX_STRING_LENGTH = 64  # Increased to accommodate hash values
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -102,29 +102,28 @@ def index():
 def notarize_document():
     try:
         logger.info("Received /notarize request")
-        logger.info(f"Headers: {request.headers}")
-        logger.info(f"Content type: {request.content_type}")
         
         # Check content type
         if not request.is_json:
-            logger.warning("Request is not JSON")
             return jsonify({'error': 'Content-Type must be application/json'}), 400
         
         data = request.get_json()
         logger.info(f"Request JSON: {data}")
         
         if not data:
-            logger.warning("Empty request body")
             return jsonify({'error': 'Missing request body'}), 400
             
-        if 'data' not in data:
-            logger.warning("Missing 'data' field in request")
-            return jsonify({'error': 'Missing data field'}), 400
+        # Use 'content' field from frontend instead of 'data'
+        if 'content' not in data:
+            return jsonify({'error': "Missing 'content' field"}), 400
             
-        tx_id, error = send_vechain_transaction(data['data'])
+        # Extract content from request
+        content = data['content']
+        logger.info(f"Notarizing content: {content[:20]}...")
+            
+        tx_id, error = send_vechain_transaction(content)
         
         if error:
-            logger.error(f"Notarization error: {error}")
             return jsonify({'error': error}), 400
             
         return jsonify({
@@ -172,5 +171,4 @@ if __name__ == '__main__':
     logger.info(f"Max String Length: {MAX_STRING_LENGTH}")
     
     app.run(host='0.0.0.0', port=5002, debug=True, use_reloader=False)
-
-
+    
