@@ -1,4 +1,4 @@
-# main.py - FINAL VERSION. Rebuilt with a new, reliable signing method.
+# main.py - FINAL VERSION. Built using the user-provided, correct signing pattern.
 # ==============================================================================
 
 # 1. --- IMPORTS ---
@@ -8,9 +8,9 @@ import os
 from dotenv import load_dotenv
 import time
 from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
+# We import the correct, specific modules as per the documentation
 from thor_devkit.transaction import Transaction
-from thor_devkit.cry import blake2b
-from secp256k1 import PrivateKey
+from thor_devkit.cry import secp256k1
 
 # 2. --- INITIALIZATION ---
 load_dotenv()
@@ -41,7 +41,7 @@ else:
         print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
 
-# 5. --- REAL VECHAIN TRANSACTION FUNCTION (NEW SIGNING LOGIC) ---
+# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Using the OFFICIAL signing pattern) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
@@ -62,17 +62,11 @@ def send_vechain_transaction(data_to_store_on_chain: str):
             'dependsOn': None, 'nonce': int(time.time() * 1000)
         }
 
-        # THIS IS THE NEW, RELIABLE SIGNING METHOD
-        # It bypasses the broken thor-devkit signing functions
+        # THIS IS THE OFFICIAL, CORRECT SIGNING PATTERN YOU PROVIDED
         tx = Transaction(tx_body)
-        signing_hash = blake2b(tx.get_signing_hash())
-        
-        pk = PrivateKey(PRIVATE_KEY_BYTES)
-        signature = pk.ecdsa_sign_recoverable(signing_hash, raw=True)
-        serialized_signature, recovery_id = pk.ecdsa_recoverable_serialize(signature)
-        
-        final_signature = serialized_signature + bytes([recovery_id])
-        tx.set_signature(final_signature)
+        signing_hash = tx.get_signing_hash() # Correct method name is get_signing_hash()
+        signature = secp256k1.sign(signing_hash, PRIVATE_KEY_BYTES)
+        tx.set_signature(signature) # Correct method name is set_signature()
         
         raw_tx = '0x' + tx.encode().hex()
         
@@ -107,5 +101,6 @@ def notarize_document():
 # 7. --- RUN THE APP (No changes) ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+
 
 
