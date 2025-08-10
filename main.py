@@ -1,4 +1,4 @@
-# main.py - FINAL VERSION. Built according to the user's correct analysis.
+# main.py - FINAL VERSION. Corrects the 'chain tag mismatch' error.
 # ==============================================================================
 
 # 1. --- IMPORTS ---
@@ -39,7 +39,7 @@ else:
         print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
 
-# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Pedantically correct formatting) ---
+# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Corrected chainTag) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
@@ -49,18 +49,16 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         response.raise_for_status()
         latest_block = response.json()
         
-        # Pedantically correct formatting for blockRef and chainTag
+        # THIS IS THE FINAL CORRECTION. The chainTag is a specific field in the block header.
+        chain_tag = latest_block['chainTag']
         block_ref = latest_block['id'][0:18]
-        chain_tag = int(latest_block['id'][-2:], 16)
 
-        # The smart contract expects a 32-byte (64 hex characters) hash.
-        # The function selector `6057361d` is prepended.
         hex_data = data_to_store_on_chain.replace('0x', '')
         data_payload = f"0x6057361d{hex_data}"
 
         clauses = [{
             'to': CONTRACT_ADDRESS,
-            'value': "0", # Value must be a string "0"
+            'value': "0",
             'data': data_payload
         }]
 
@@ -85,7 +83,6 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         send_response = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
         
         if send_response.status_code != 200:
-            # Provide the detailed error message from the node itself
             raise Exception(f"API Error {send_response.status_code}: {send_response.text}")
             
         tx_id = send_response.json()['id']
