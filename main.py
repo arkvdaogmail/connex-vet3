@@ -1,48 +1,16 @@
-from flask import Flask, request, jsonify, render_template
-import requests
-import os
-from dotenv import load_dotenv
-import secrets
-from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
-from thor_devkit.transaction import Transaction
-from thor_devkit.cry import secp256k1
-
-# --- INITIALIZATION ---
-load_dotenv()
-app = Flask(__name__)
-
-# --- CONFIGURATION ---
-NODE_URL = os.getenv("NODE_URL")
-CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
-MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
-
-# --- DERIVE PRIVATE KEY ---
-PRIVATE_KEY_BYTES = None
-SENDER_ADDRESS = None
-
-if not MNEMONIC_PHRASE:
-    print("FATAL ERROR: 'PRIVATE_KEY' not found in .env file.")
-else:
-    try:
-        seed_bytes = Bip39SeedGenerator(MNEMONIC_PHRASE).Generate()
-        bip44_mst = Bip44.FromSeed(seed_bytes, Bip44Coins.VECHAIN)
-        bip44_acc = bip44_mst.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
-        bip44_addr = bip44_acc.AddressIndex(0)
-        PRIVATE_KEY_BYTES = bip44_addr.PrivateKey().Raw().ToBytes()
-        SENDER_ADDRESS = bip44_addr.Address()
-        print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
-    except Exception as e:
-        print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
-        print(f"           Underlying Error: {e}")
+MAX_STRING_LENGTH = 18
 
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
     try:
+        # Truncate or validate the input string
+        if len(data_to_store_on_chain) > MAX_STRING_LENGTH:
+            return None, f"Input string exceeds max allowed length of {MAX_STRING_LENGTH}."
+
         response = requests.get(f"{NODE_URL}/blocks/best")
         response.raise_for_status()
         latest_block = response.json()
-        # blockRef: first 8 bytes (16 hex chars) after '0x'
         block_ref = latest_block['id'][2:18]
 
         hex_data = data_to_store_on_chain.replace('0x', '')
@@ -55,7 +23,7 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         }]
 
         tx_body = {
-            'chainTag': 0x27,  # Testnet; use 0x4a for mainnet
+            'chainTag': 0x27,
             'blockRef': block_ref,
             'expiration': 32,
             'clauses': clauses,
@@ -81,27 +49,6 @@ def send_vechain_transaction(data_to_store_on_chain: str):
     except Exception as e:
         print(f"ERROR sending transaction: {e}")
         return None, str(e)
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/notarize', methods=['POST'])
-def notarize_document():
-    data = request.json
-    file_hash = data.get('content')
-    if not file_hash:
-        return jsonify({"status": "error", "message": "No file hash provided."}), 400
-
-    transaction_id, error_message = send_vechain_transaction(file_hash)
-
-    if transaction_id:
-        return jsonify({"status": "success", "transaction_id": transaction_id})
-    else:
-        return jsonify({"status": "error", "message": f"Error: {error_message}"}), 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
 
 
 
