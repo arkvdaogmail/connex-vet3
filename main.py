@@ -1,4 +1,4 @@
-# main.py - FINAL VERSION. Fixes the 'Address' attribute error and moves to port 5002.
+# main.py - FINAL VERSION. Corrects the 'chainTag' KeyError.
 # ==============================================================================
 
 # 1. --- IMPORTS ---
@@ -20,7 +20,7 @@ NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
 
-# 4. --- DERIVE PRIVATE KEY (This now has the corrected 'bip44_addr.Address()' method) ---
+# 4. --- DERIVE PRIVATE KEY (This part is correct) ---
 PRIVATE_KEY_BYTES = None
 SENDER_ADDRESS = None
 
@@ -33,16 +33,13 @@ else:
         bip44_acc = bip44_mst.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
         bip44_addr = bip44_acc.AddressIndex(0)
         PRIVATE_KEY_BYTES = bip44_addr.PrivateKey().Raw().ToBytes()
-        
-        # THIS IS THE CORRECTED LINE. The method is on the 'bip44_addr' object.
         SENDER_ADDRESS = bip44_addr.Address()
-        
         print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
     except Exception as e:
         print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
 
-# 5. --- REAL VECHAIN TRANSACTION FUNCTION (This version is correct) ---
+# 5. --- REAL VECHAIN TRANSACTION FUNCTION (This has the final, correct chainTag logic) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
@@ -52,17 +49,15 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         response.raise_for_status()
         latest_block = response.json()
         
-        chain_tag = latest_block['chainTag']
-        block_ref = latest_block['id'][0:18]
+        # THIS IS THE FINAL CORRECTION. The chainTag is the last byte of the block ID.
+        block_id = latest_block['id']
+        chain_tag = int(block_id[-2:], 16)
+        block_ref = block_id[0:18]
 
         hex_data = data_to_store_on_chain.replace('0x', '')
         data_payload = f"0x6057361d{hex_data}"
 
-        clauses = [{
-            'to': CONTRACT_ADDRESS,
-            'value': "0",
-            'data': data_payload
-        }]
+        clauses = [{'to': CONTRACT_ADDRESS, 'value': "0", 'data': data_payload}]
 
         tx_body = {
             'chainTag': chain_tag,
@@ -113,7 +108,7 @@ def notarize_document():
     else:
         return jsonify({"status": "error", "message": f"Error: {error_message}"}), 500
 
-# 7. --- RUN THE APP (This now uses port 5002 to avoid the conflict) ---
+# 7. --- RUN THE APP (Using port 5002 to avoid conflicts) ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=True)
 
