@@ -32,7 +32,9 @@ else:
     # If the phrase exists, try to derive the key from it
     try:
         PRIVATE_KEY_BYTES = cry.mnemonic.derive_private_key(MNEMONIC_PHRASE.split(' '))
-        SENDER_ADDRESS = cry.to_address(PRIVATE_KEY_BYTES)
+        # --- CORRECTED CODE ---
+SENDER_ADDRESS = cry.public_key_to_address(cry.private_key_to_public_key(PRIVATE_KEY_BYTES))
+
         print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
     except Exception as e:
         print(f"FATAL ERROR: Could not derive private key from the mnemonic phrase in .env file.")
