@@ -92,5 +92,5 @@ if __name__ == '__main__':
     if not NODE_URL or not CONTRACT_ADDRESS or not PRIVATE_KEY_HEX:
         print("FATAL ERROR: NODE_URL, CONTRACT_ADDRESS, or PRIVATE_KEY not configured in .env")
         exit(1)
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5002, debug=True)
 
