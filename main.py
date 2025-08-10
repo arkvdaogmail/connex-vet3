@@ -1,4 +1,4 @@
-# main.py - The Final, Corrected, and Complete Version
+# main.py - The Final, Corrected, and Most Robust Version
 # ==============================================================================
 
 # 1. --- IMPORTS ---
@@ -10,27 +10,45 @@ from dotenv import load_dotenv
 import time
 
 # 2. --- INITIALIZATION ---
-load_dotenv()
+# Load the .env file. The `find_dotenv()` function helps locate it reliably.
+# If the .env file is not found, this will print a clear warning.
+env_path = load_dotenv(find_dotenv=True)
+if not env_path:
+    print("!!! WARNING: .env file not found. Make sure it exists in the project root directory.")
+
 app = Flask(__name__)
 
 # 3. --- CONFIGURATION ---
+# Load variables from the environment. If a variable is missing, it will be `None`.
 NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
 
-# 4. --- DERIVE PRIVATE KEY FROM 12-WORD PHRASE ---
-try:
-    PRIVATE_KEY_BYTES = cry.mnemonic.derive_private_key(MNEMONIC_PHRASE.split(' '))
-    SENDER_ADDRESS = cry.to_address(PRIVATE_KEY_BYTES) # Corrected function name
-    print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
-except Exception as e:
-    print(f"FATAL ERROR: Could not derive private key. Check .env file. Error: {e}")
-    PRIVATE_KEY_BYTES = None
+# 4. --- DERIVE PRIVATE KEY (with better error checking) ---
+PRIVATE_KEY_BYTES = None # Start with an empty key
+
+# First, check if the mnemonic phrase was loaded from the .env file
+if not MNEMONIC_PHRASE:
+    print("FATAL ERROR: 'PRIVATE_KEY' not found in .env file or the file is empty.")
+    print("           Please check your .env file content and name.")
+else:
+    # If the phrase exists, try to derive the key from it
+    try:
+        PRIVATE_KEY_BYTES = cry.mnemonic.derive_private_key(MNEMONIC_PHRASE.split(' '))
+        SENDER_ADDRESS = cry.to_address(PRIVATE_KEY_BYTES)
+        print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
+    except Exception as e:
+        print(f"FATAL ERROR: Could not derive private key from the mnemonic phrase in .env file.")
+        print(f"           This can happen if the 12-word phrase is incorrect.")
+        print(f"           Underlying Error: {e}")
+        PRIVATE_KEY_BYTES = None # Ensure key is None on failure
 
 # 5. --- REAL VECHAIN TRANSACTION FUNCTION ---
 def send_vechain_transaction(data_to_store_on_chain: str):
+    # This safety check is now supported by the clearer error messages above.
     if not PRIVATE_KEY_BYTES:
-        return None, "Private key is not configured correctly."
+        return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
+    
     try:
         response = requests.get(f"{NODE_URL}/blocks/best")
         response.raise_for_status()
@@ -39,21 +57,12 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         block_ref = latest_block['id'][:18]
 
         encoded_data = data_to_store_on_chain.encode('utf-8').hex()
-        clauses = [{
-            'to': CONTRACT_ADDRESS,
-            'value': 0,
-            'data': f"0x6057361d{encoded_data}"
-        }]
+        clauses = [{'to': CONTRACT_ADDRESS, 'value': 0, 'data': f"0x6057361d{encoded_data}"}]
 
         tx_body = {
-            'chainTag': chain_tag,
-            'blockRef': block_ref,
-            'expiration': 32,
-            'clauses': clauses,
-            'gasPriceCoef': 128,
-            'gas': 100000,
-            'dependsOn': None,
-            'nonce': int(time.time() * 1000)
+            'chainTag': chain_tag, 'blockRef': block_ref, 'expiration': 32,
+            'clauses': clauses, 'gasPriceCoef': 128, 'gas': 100000,
+            'dependsOn': None, 'nonce': int(time.time() * 1000)
         }
 
         tx = transaction.Transaction(tx_body)
@@ -79,14 +88,14 @@ def notarize_document():
     file_hash = data.get('content')
     if not file_hash:
         return jsonify({"status": "error", "message": "No file hash provided."}), 400
+    
     transaction_id, error_message = send_vechain_transaction(file_hash)
+    
     if transaction_id:
         return jsonify({"status": "success", "transaction_id": transaction_id})
     else:
-        return jsonify({"status": "error", "message": f"Failed to send transaction: {error_message}"}), 500
+        return jsonify({"status": "error", "message": f"Error: {error_message}"}), 500
 
 # 7. --- RUN THE APP ---
 if __name__ == '__main__':
-    # This is set to port 5001 as we agreed.
     app.run(host='0.0.0.0', port=5001, debug=True)
-
