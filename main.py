@@ -1,117 +1,79 @@
-# main.py - FINAL VERSION. Respects the 18-character contract limit as per the user's correct analysis.
-# =======================================================================================================
-
-# 1. --- IMPORTS ---
+# main.py - VeChain Transaction Sender (Flask)
 from flask import Flask, request, jsonify, render_template
 import requests
 import os
-from dotenv import load_dotenv
 import secrets
-from bip_utils import Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
+from dotenv import load_dotenv
 from thor_devkit.transaction import Transaction
 from thor_devkit.cry import secp256k1
 
-# 2. --- INITIALIZATION ---
+# Load environment variables
 load_dotenv()
-app = Flask(__name__)
-
-# 3. --- CONFIGURATION ---
 NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
-MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
+PRIVATE_KEY_HEX = os.getenv("PRIVATE_KEY")
 MAX_STRING_LENGTH = 18
 
-# 4. --- DERIVE PRIVATE KEY (This part is correct) ---
-PRIVATE_KEY_BYTES = None
-SENDER_ADDRESS = None
+app = Flask(__name__)
 
-if not MNEMONIC_PHRASE:
-    print("FATAL ERROR: 'PRIVATE_KEY' not found in .env file.")
-else:
-    try:
-        seed_bytes = Bip39SeedGenerator(MNEMONIC_PHRASE).Generate()
-        bip44_mst = Bip44.FromSeed(seed_bytes, Bip44Coins.VECHAIN)
-        bip44_acc = bip44_mst.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
-        bip44_addr = bip44_acc.AddressIndex(0)
-        PRIVATE_KEY_BYTES = bip44_addr.PrivateKey().Raw().ToBytes()
-        SENDER_ADDRESS = bip44_addr.Address()
-        print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
-    except Exception as e:
-        print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
-        print(f"           Underlying Error: {e}")
+def get_block_ref():
+    # Fetch the latest block to get blockRef (first 8 bytes of block id)
+    resp = requests.get(f"{NODE_URL}/blocks/best")
+    resp.raise_for_status()
+    block_id = resp.json()['id']
+    return block_id[2:18]  # Remove '0x' and take first 16 hex chars
 
-# 5. --- VECHAIN TRANSACTION FUNCTION (Combined and improved version) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
-    if not PRIVATE_KEY_BYTES:
-        return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
+    if not PRIVATE_KEY_HEX:
+        return None, "Private key not configured."
+    if len(data_to_store_on_chain) > MAX_STRING_LENGTH:
+        return None, f"Input exceeds {MAX_STRING_LENGTH} chars."
+
     try:
-        # Truncate or validate the input string
-        if len(data_to_store_on_chain) > MAX_STRING_LENGTH:
-            return None, f"Input string exceeds max allowed length of {MAX_STRING_LENGTH}."
-
-        response = requests.get(f"{NODE_URL}/blocks/best")
-        response.raise_for_status()
-        latest_block = response.json()
-        block_ref = latest_block['id'][2:18]
-
-        hex_data = data_to_store_on_chain.replace('0x', '')
-        data_payload = f"0x6057361d{hex_data}"
-
-        clauses = [{
+        block_ref = get_block_ref()
+        # Prepare the clause (assumes data is already ABI-encoded or a hex string)
+        clause = {
             'to': CONTRACT_ADDRESS,
             'value': 0,
-            'data': data_payload
-        }]
-
+            'data': data_to_store_on_chain if data_to_store_on_chain.startswith('0x') else '0x' + data_to_store_on_chain
+        }
         tx_body = {
-            'chainTag': 0x27,
+            'chainTag': 0x27,  # Testnet chainTag; use 0x4a for mainnet
             'blockRef': block_ref,
             'expiration': 32,
-            'clauses': clauses,
+            'clauses': [clause],
             'gasPriceCoef': 0,
-            'gas': 100000,
+            'gas': 100000,  # Consider estimating gas for production
             'dependsOn': None,
             'nonce': secrets.randbits(64)
         }
-
         tx = Transaction(tx_body)
         signing_hash = tx.get_signing_hash()
-        signature = secp256k1.sign(signing_hash, PRIVATE_KEY_BYTES)
+        signature = secp256k1.sign(signing_hash, bytes.fromhex(PRIVATE_KEY_HEX))
         tx.set_signature(signature)
         raw_tx = '0x' + tx.encode().hex()
 
-        send_response = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
-        if send_response.status_code != 200:
-            raise Exception(f"API Error {send_response.status_code}: {send_response.text}")
-
-        tx_id = send_response.json()['id']
-        print(f"SUCCESS: Transaction sent! ID: {tx_id}")
+        # Send the signed transaction
+        send_resp = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
+        send_resp.raise_for_status()
+        tx_id = send_resp.json()['id']
         return tx_id, None
     except Exception as e:
-        print(f"ERROR sending transaction: {e}")
         return None, str(e)
 
-# 6. --- FLASK ROUTES ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/send_transaction', methods=['POST'])
 def send_transaction():
-    try:
-        data = request.get_json()
-        if not data or 'data' not in data:
-            return jsonify({'error': 'Missing data field'}), 400
-        
-        data_to_store = data['data']
-        tx_id, error = send_vechain_transaction(data_to_store)
-        
-        if error:
-            return jsonify({'error': error}), 400
-        
-        return jsonify({'success': True, 'transaction_id': tx_id})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    data = request.get_json()
+    if not data or 'data' not in data:
+        return jsonify({'error': 'Missing data field'}), 400
+    tx_id, error = send_vechain_transaction(data['data'])
+    if error:
+        return jsonify({'error': error}), 400
+    return jsonify({'success': True, 'transaction_id': tx_id})
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -119,21 +81,13 @@ def health_check():
         'status': 'healthy',
         'node_url': NODE_URL,
         'contract_address': CONTRACT_ADDRESS,
-        'sender_address': SENDER_ADDRESS,
         'max_string_length': MAX_STRING_LENGTH
     })
 
-# 7. --- MAIN EXECUTION ---
 if __name__ == '__main__':
-    if not NODE_URL or not CONTRACT_ADDRESS:
-        print("FATAL ERROR: NODE_URL or CONTRACT_ADDRESS not configured in .env file")
+    if not NODE_URL or not CONTRACT_ADDRESS or not PRIVATE_KEY_HEX:
+        print("FATAL ERROR: NODE_URL, CONTRACT_ADDRESS, or PRIVATE_KEY not configured in .env")
         exit(1)
-    
-    print(f"Starting VeChain Flask App...")
-    print(f"Node URL: {NODE_URL}")
-    print(f"Contract Address: {CONTRACT_ADDRESS}")
-    print(f"Max String Length: {MAX_STRING_LENGTH}")
-    
     app.run(host='0.0.0.0', port=5001, debug=True)
 
 
