@@ -1,4 +1,4 @@
-# main.py - The Final, Corrected Version (Fixes the TypeError Crash)
+# main.py - The Final Version (Fixes SyntaxError and All Previous Bugs)
 # ==============================================================================
 
 # 1. --- IMPORTS ---
@@ -10,41 +10,33 @@ from dotenv import load_dotenv
 import time
 
 # 2. --- INITIALIZATION ---
-# This is the corrected line. It simply loads the .env file without the incompatible argument.
 load_dotenv()
-
 app = Flask(__name__)
 
 # 3. --- CONFIGURATION ---
-# Load variables from the environment. If a variable is missing, it will be `None`.
 NODE_URL = os.getenv("NODE_URL")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 MNEMONIC_PHRASE = os.getenv("PRIVATE_KEY")
 
-# 4. --- DERIVE PRIVATE KEY (with better error checking) ---
-PRIVATE_KEY_BYTES = None # Start with an empty key
+# 4. --- DERIVE PRIVATE KEY (with all corrections) ---
+PRIVATE_KEY_BYTES = None
 
-# First, check if the mnemonic phrase was loaded from the .env file
 if not MNEMONIC_PHRASE:
-    print("FATAL ERROR: 'PRIVATE_KEY' not found in .env file or the file is empty.")
-    print("           Please check your .env file content and name.")
+    print("FATAL ERROR: 'PRIVATE_KEY' not found in .env file.")
 else:
-    # If the phrase exists, try to derive the key from it
+    # This is the corrected try/except block
     try:
         PRIVATE_KEY_BYTES = cry.mnemonic.derive_private_key(MNEMONIC_PHRASE.split(' '))
-        # --- CORRECTED CODE ---
-SENDER_ADDRESS = cry.public_key_to_address(cry.private_key_to_public_key(PRIVATE_KEY_BYTES))
-
+        # This is the corrected function call
+        SENDER_ADDRESS = cry.public_key_to_address(cry.private_key_to_public_key(PRIVATE_KEY_BYTES))
         print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
     except Exception as e:
-        print(f"FATAL ERROR: Could not derive private key from the mnemonic phrase in .env file.")
-        print(f"           This can happen if the 12-word phrase is incorrect.")
+        print(f"FATAL ERROR: Could not derive private key from the mnemonic phrase.")
         print(f"           Underlying Error: {e}")
-        PRIVATE_KEY_BYTES = None # Ensure key is None on failure
+        PRIVATE_KEY_BYTES = None
 
 # 5. --- REAL VECHAIN TRANSACTION FUNCTION ---
 def send_vechain_transaction(data_to_store_on_chain: str):
-    # This safety check is now supported by the clearer error messages above.
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
     
@@ -98,4 +90,6 @@ def notarize_document():
 # 7. --- RUN THE APP ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+
+
 
