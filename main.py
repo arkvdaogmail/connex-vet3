@@ -1,4 +1,4 @@
-# main.py - FINAL VERSION. Rebuilt to match official VeChain examples.
+# main.py - FINAL VERSION. Built according to the user's correct analysis.
 # ==============================================================================
 
 # 1. --- IMPORTS ---
@@ -39,7 +39,7 @@ else:
         print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
 
-# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Rebuilt based on official examples) ---
+# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Pedantically correct formatting) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
@@ -49,18 +49,19 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         response.raise_for_status()
         latest_block = response.json()
         
-        # Structure based on official examples
+        # Pedantically correct formatting for blockRef and chainTag
+        block_ref = latest_block['id'][0:18]
         chain_tag = int(latest_block['id'][-2:], 16)
-        block_ref = latest_block['id'][:18]
 
-        # The data needs to be a 32-byte hex string for the smart contract
-        # We will use the hash directly as the data payload.
-        # The contract function selector is `0x6057361d`
-        hex_data = data_to_store_on_chain
+        # The smart contract expects a 32-byte (64 hex characters) hash.
+        # The function selector `6057361d` is prepended.
+        hex_data = data_to_store_on_chain.replace('0x', '')
+        data_payload = f"0x6057361d{hex_data}"
+
         clauses = [{
             'to': CONTRACT_ADDRESS,
             'value': "0", # Value must be a string "0"
-            'data': f"0x6057361d{hex_data.replace('0x', '')}"
+            'data': data_payload
         }]
 
         tx_body = {
@@ -68,7 +69,7 @@ def send_vechain_transaction(data_to_store_on_chain: str):
             'blockRef': block_ref,
             'expiration': 32,
             'clauses': clauses,
-            'gasPriceCoef': 0, # Use 0 for testnet as recommended in some examples
+            'gasPriceCoef': 0,
             'gas': 100000,
             'dependsOn': None,
             'nonce': secrets.randbits(64)
@@ -84,6 +85,7 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         send_response = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
         
         if send_response.status_code != 200:
+            # Provide the detailed error message from the node itself
             raise Exception(f"API Error {send_response.status_code}: {send_response.text}")
             
         tx_id = send_response.json()['id']
@@ -115,4 +117,3 @@ def notarize_document():
 # 7. --- RUN THE APP ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
-
