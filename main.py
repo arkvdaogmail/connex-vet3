@@ -1,10 +1,11 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 import requests
 import os
 import secrets
 from dotenv import load_dotenv
 from thor_devkit.transaction import Transaction
 from thor_devkit.cry import secp256k1
+from flask_cors import CORS  # Fixes CORS issues
 
 # Load environment variables
 load_dotenv()
@@ -14,6 +15,7 @@ PRIVATE_KEY_HEX = os.getenv("PRIVATE_KEY")
 MAX_STRING_LENGTH = 18
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 def get_block_ref():
     # Fetch the latest block to get blockRef (first 8 bytes of block id)
@@ -69,8 +71,9 @@ def send_vechain_transaction(data_to_store_on_chain: str):
 def index():
     return render_template('index.html')
 
-@app.route('/send_transaction', methods=['POST'])
-def send_transaction():
+# Route for document notarization
+@app.route('/notarize', methods=['POST'])
+def notarize_document():
     data = request.get_json()
     if not data or 'data' not in data:
         return jsonify({'error': 'Missing data field'}), 400
@@ -79,6 +82,12 @@ def send_transaction():
         return jsonify({'error': error}), 400
     return jsonify({'success': True, 'transaction_id': tx_id})
 
+# Alias to match your frontend call
+@app.route('/send_transaction', methods=['POST'])
+def send_transaction():
+    return notarize_document()  # Reuse the same logic
+
+# Health check endpoint
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
@@ -88,9 +97,16 @@ def health_check():
         'max_string_length': MAX_STRING_LENGTH
     })
 
+# Fix favicon 404 error
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204  # No content response
+
 if __name__ == '__main__':
     if not NODE_URL or not CONTRACT_ADDRESS or not PRIVATE_KEY_HEX:
         print("FATAL ERROR: NODE_URL, CONTRACT_ADDRESS, or PRIVATE_KEY not configured in .env")
         exit(1)
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    app.run(host='0.0.0.0', port=5002, debug=True, use_reloader=False)  # Added use_reloader
+
+
 
