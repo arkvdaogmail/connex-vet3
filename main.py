@@ -1,4 +1,3 @@
-# main.py - VeChain Transaction Sender (Flask)
 from flask import Flask, request, jsonify, render_template
 import requests
 import os
@@ -9,7 +8,7 @@ from thor_devkit.cry import secp256k1
 
 # Load environment variables
 load_dotenv()
-NODE_URL = os.getenv("NODE_URL")
+NODE_URL = os.getenv("NODE_URL")  # e.g. "https://testnet.vechain.org"
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 PRIVATE_KEY_HEX = os.getenv("PRIVATE_KEY")
 MAX_STRING_LENGTH = 18
@@ -31,7 +30,6 @@ def send_vechain_transaction(data_to_store_on_chain: str):
 
     try:
         block_ref = get_block_ref()
-        # Prepare the clause (assumes data is already ABI-encoded or a hex string)
         clause = {
             'to': CONTRACT_ADDRESS,
             'value': 0,
@@ -43,7 +41,7 @@ def send_vechain_transaction(data_to_store_on_chain: str):
             'expiration': 32,
             'clauses': [clause],
             'gasPriceCoef': 0,
-            'gas': 100000,  # Consider estimating gas for production
+            'gas': 100000,  # For production, estimate gas dynamically
             'dependsOn': None,
             'nonce': secrets.randbits(64)
         }
@@ -55,9 +53,15 @@ def send_vechain_transaction(data_to_store_on_chain: str):
 
         # Send the signed transaction
         send_resp = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
+        # Print the raw response for troubleshooting
+        print("Status code:", send_resp.status_code)
+        print("Response text:", send_resp.text)
         send_resp.raise_for_status()
-        tx_id = send_resp.json()['id']
-        return tx_id, None
+        try:
+            tx_id = send_resp.json()['id']
+            return tx_id, None
+        except Exception:
+            return None, f"Node did not return JSON. Response: {send_resp.text}"
     except Exception as e:
         return None, str(e)
 
@@ -89,7 +93,4 @@ if __name__ == '__main__':
         print("FATAL ERROR: NODE_URL, CONTRACT_ADDRESS, or PRIVATE_KEY not configured in .env")
         exit(1)
     app.run(host='0.0.0.0', port=5001, debug=True)
-
-
-
 
