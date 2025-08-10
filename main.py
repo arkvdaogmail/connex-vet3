@@ -1,7 +1,4 @@
-# main.py - The FINAL, REBUILT Version using a more reliable library
-# ==============================================================================
 
-# 1. --- IMPORTS ---
 from flask import Flask, request, jsonify, render_template
 import requests
 import os
@@ -26,14 +23,11 @@ if not MNEMONIC_PHRASE:
     print("FATAL ERROR: 'PRIVATE_KEY' not found in .env file.")
 else:
     try:
-        # Generate seed from the 12-word mnemonic
         seed_bytes = Bip39SeedGenerator(MNEMONIC_PHRASE).Generate()
-        # Derive the VeChain key using the standard BIP44 path for VET
         bip44_mst = Bip44.FromSeed(seed_bytes, Bip44Coins.VECHAIN)
         bip44_acc = bip44_mst.Purpose().Coin().Account(0).Change(Bip44Changes.CHAIN_EXT)
         bip44_addr = bip44_acc.AddressIndex(0)
         
-        # Get the private key bytes and the address
         PRIVATE_KEY_BYTES = bip44_addr.PrivateKey().Raw().ToBytes()
         SENDER_ADDRESS = bip44_addr.Address()
         print(f"SUCCESS: Wallet address derived successfully: {SENDER_ADDRESS}")
@@ -41,14 +35,13 @@ else:
         print(f"FATAL ERROR: Could not derive private key. Check the 12-word phrase in .env file.")
         print(f"           Underlying Error: {e}")
 
-# 5. --- REAL VECHAIN TRANSACTION FUNCTION (Now uses thor-devkit only for signing) ---
+# 5. --- REAL VECHAIN TRANSACTION FUNCTION (This has the corrected 'sign_with' method) ---
 def send_vechain_transaction(data_to_store_on_chain: str):
     if not PRIVATE_KEY_BYTES:
         return None, "Private key is not configured correctly. Check terminal for FATAL ERROR messages on startup."
     
     try:
-        # This part remains the same as it's standard REST API interaction
-        from thor_devkit import transaction # Import only what we need
+        from thor_devkit import transaction
         
         response = requests.get(f"{NODE_URL}/blocks/best")
         response.raise_for_status()
@@ -66,7 +59,10 @@ def send_vechain_transaction(data_to_store_on_chain: str):
         }
 
         tx = transaction.Transaction(tx_body)
-        tx.sign(PRIVATE_KEY_BYTES)
+        
+        # THIS IS THE CORRECTED LINE. The method is 'sign_with', not 'sign'.
+        tx.sign_with(PRIVATE_KEY_BYTES)
+        
         raw_tx = '0x' + tx.encode().hex()
         
         send_response = requests.post(f"{NODE_URL}/transactions", json={'raw': raw_tx})
@@ -100,6 +96,7 @@ def notarize_document():
 # 7. --- RUN THE APP (No changes needed here) ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+
 
 
 
