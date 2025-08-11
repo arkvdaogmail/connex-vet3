@@ -1,0 +1,6 @@
+yaml
+services:
+  - type: web
+    name: connex-vet3
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: gunicorn backend.main:app --timeout 120
